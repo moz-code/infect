@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Copyright 2013 Alexandre Terrasa <alexandre@moz-code.org>.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+if [ $# -lt 1 ]
+then
+	echo "usage: $0 file.conf [-x]"
+	echo ""
+	echo "$0 without -x will only show modifications"
+	echo "$0 with -x will apply modifications"
+	exit 1
+fi
+
+conf_file=$1
+if [ ! -f "$conf_file" ]; then
+	echo -e "ERROR: cannot access config file $conf_file"
+	exit 1
+fi
+
+conf_dir=`dirname $conf_file`
+conf_dir=`readlink -e $conf_dir`
+if [ ! -d "$conf_dir" ]; then
+	echo -e "ERROR: cannot access config dir $conf_dir"
+	exit 1
+fi
+
+# load config file
+echo -e "Infect with config"
+while read l
+do
+	# split line
+	line=($l)
+
+	# check config source exists
+	source=${line[0]}
+	if [ ! -e $conf_dir/$source ]; then
+		echo -e "WARNING: source file $source not found in $conf_dir"
+		continue
+	fi
+
+	# check that target exist
+	target=${line[1]}
+	targetdir=`dirname $target`
+	if [[ $targetdir == "~"* ]]; then
+		targetdir=`readlink -e "$HOME/${targetdir#"~"}"`
+	fi
+	if [ ! -e $targetdir ]; then
+		if [[ $2 == "-x" ]]; then
+			mkdir -p $targetdir
+		fi
+		echo -e " + dir $targetdir"
+	fi
+
+	# create symbolic link
+	if [[ $2 == "-x" ]]; then
+		ln -sf "$conf_dir/$source" "$targetdir/`basename $target`"
+	fi
+	echo -e " + lnk $targetdir/`basename $target` > $conf_dir/$source"
+done < $conf_file
